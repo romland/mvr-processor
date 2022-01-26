@@ -1,0 +1,33 @@
+[package]
+name = "mvr"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+#[build]
+#target = "armv7-unknown-linux-gnueabihf"
+
+[profile.dev]
+#opt-level = 3  # default is '3' (speed) -- z= Optimize for size. (not much gained tbh) (was 350kb)
+#overflow-checks = false 
+
+[profile.release]
+lto = true # This can, for example, remove dead code and often times reduces binary size (was 370kb after strip)
+opt-level = 3  # default is '3' (speed) -- z= Optimize for size. (not much gained tbh) (was 350kb)
+#codegen-units = 1 # This can slow down compilation time, but can reduce size of binary (was 334kb)
+#panic = "abort" # no stacktrace on panic; was 334kb; 
+# current 310kb
+debuginfo = 0 #0 is default actually
+debug = false   
+overflow-checks = false 
+
+[dependencies]
+bufstream = "0.1"
+byteorder = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+#async-std = "*"
+#futures = "0.3"
+#sync-tungstenite = "*"
+pico-args = "0.4.2"
