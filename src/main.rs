@@ -20,8 +20,9 @@ use std::sync::mpsc::{Sender, Receiver};
 #[allow(unused_mut)]
 fn main()
 {
-	/*
-    let args = match parse_args() {
+/*
+	#[allow(unused_variables)]
+    let config = match parse_args() {
         Ok(v) => v,
         Err(e) => {
             eprintln!("Error: {}.", e);
@@ -29,9 +30,8 @@ fn main()
         }
     };
 
-    println!("debug args: {:#?}", args);
-	*/
-
+    println!("debug args: {:#?}", config);
+*/
 	let addr: SocketAddr = SocketAddr::from_str("0.0.0.0:8001").unwrap();
     let listener = TcpListener::bind(addr).unwrap();
 
@@ -70,59 +70,70 @@ fn main()
 }
 
 
-
-/*
-todo cmd line args:
-	- version
-	- vector min magnitude
-		default 2
-	- cluster epsilon
-		default 2
-	- cluster min points
-		defaul 4
-	- listen address
-		default 127.0.0.1
-	- listen port
-		default 8001
-	- width in vectors
-		default 121
-	- height in vectors
-		default 68
-	- output-type
-		- json (default)
-		- debug (will not output json...)
-		- full-screen render of ascii
-	- ignore area
-	- discardInactiveAfter
-	- sadThreshold (a TODO in node too!) but wow, this worked really well
-*/
 #[allow(dead_code)]
 const HELP: &str = "\
 Xorzee MVR
 USAGE:
   mvr [OPTIONS]
 FLAGS:
-  -h, --help            This help information
+  --help                This help information
 OPTIONS:
-  --number NUMBER       Sets a number
-  --opt-number NUMBER   Sets an optional number
-  --width WIDTH         Sets width [default: 10]
-  --output PATH         Sets an output path
+  --version             Outputs version of Xorzee MVR.
+  --width NUMBER        Sets screen width in motion vectors.
+                        (deafult: 121 for 1920)
+  --height NUMBER       Sets screen height in motion vectors.
+                        (default: 68 for 1080)
+  --minmagnitude NUMBER Sets minimum magnitude for a vector
+                        to count as active.
+                        (default: 2)
+  --epsilon NUMBER      Sets maximum distance for points to 
+                        belong to a cluster.
+                        (default: 2)
+  --minpoints NUMBER    Sets minimum number of points to classify
+                        something as a cluster.
+                        (default: 4)
+  --listen ADDRESS      Sets IP address to listen to.
+                        (default: 127.0.0.1)
+  --port PORT           Sets port to listen to.
+                        (default: 8001)
+  --output [JSON|DEBUG] Set output to JSON or DEBUG.
+                        (default: JSON)
+  --ignore POLYGONS     Set polygons to specify areas that should
+                        be ignored.
+                        (default: none)
+  --discardafter NUMBER Set the time for which clusters should be 
+                        discarded if they are inactive.
+                        (default: 2000)
+  --sadthreshold NUMBER Set the minimum SAD that needs to be met to
+                        classify a block as active.
+                        (default: 250)
 ";
 
 #[allow(dead_code)]
-#[derive(Debug)]
-struct AppArgs {
-    number: u32,
-    opt_number: Option<u32>,
-    width: u32,
-    input: std::path::PathBuf,
-    output: Option<std::path::PathBuf>,
+#[derive(Debug, Clone)]
+pub struct AppArgs {
+    width: usize,
+    height: usize,
+    minmagnitude: f32,
+    epsilon: f32,
+    minpoints: usize,
+    listen: String,
+    port: String,
+    output: String,
+    ignore: String,
+    discardafter: u32,
+    sadthreshold: u32
+
+    // number: u32,
+    // opt_number: u32,
+    // input: Option<std::path::PathBuf>,
+    // output: td::path::PathBuf,
 }
 
-
+/*
 #[allow(dead_code)]
 fn parse_args() -> Result<AppArgs, pico_args::Error> {
+
     let mut pargs = pico_args::Arguments::from_env();
 
     // Help has a higher priority and should be handled separately.
@@ -134,15 +145,30 @@ fn parse_args() -> Result<AppArgs, pico_args::Error> {
     let args = AppArgs {
         // Parses a required value that implements `FromStr`.
         // Returns an error if not present.
-        number: pargs.value_from_str("--number")?,
+        // number: pargs.value_from_str("--number")?,
+
         // Parses an optional value that implements `FromStr`.
-        opt_number: pargs.opt_value_from_str("--opt-number")?,
+        // opt_number: pargs.opt_value_from_str("--opt-number")?,
+
         // Parses an optional value from `&str` using a specified function.
-        width: pargs.opt_value_from_fn("--width", parse_width)?.unwrap_or(10),
+        width: pargs.opt_value_from_fn("--width", parse_number)?.unwrap_or(121),
+        height: pargs.opt_value_from_fn("--height", parse_number)?.unwrap_or(68),
+        minmagnitude: pargs.opt_value_from_fn("--minmagnitude", parse_number)?.unwrap_or(2),
+        epsilon: pargs.opt_value_from_fn("--epsilon", parse_number)?.unwrap_or(2),
+        minpoints: pargs.opt_value_from_fn("--minpoints", parse_number)?.unwrap_or(4),
+
+        listen: pargs.opt_value_from_fn("--listen", parse_ip)?.unwrap_or("127.0.0.1"),
+        port: pargs.opt_value_from_fn("--port", parse_port)?.unwrap_or("8001"),
+        output: pargs.opt_value_from_fn("--output", parse_output)?.unwrap_or("JSON"),
+        ignore: pargs.opt_value_from_fn("--ignore", parse_polygons)?.unwrap_or(""),
+        discardafter: pargs.opt_value_from_fn("--discardafter", parse_number)?.unwrap_or(2000),
+        sadthreshold: pargs.opt_value_from_fn("--sadthreshold", parse_number)?.unwrap_or(250),
+    
         // Parses an optional value from `&OsStr` using a specified function.
-        output: pargs.opt_value_from_os_str("--input", parse_path)?,
+        // output: pargs.opt_value_from_os_str("--input", parse_path)?,
+
         // Parses a required free-standing/positional argument.
-        input: pargs.free_from_str()?,
+        // input: pargs.free_from_str()?,
     };
 
     // It's up to the caller what to do with the remaining arguments.
@@ -153,13 +179,4 @@ fn parse_args() -> Result<AppArgs, pico_args::Error> {
 
     Ok(args)
 }
-
-#[allow(dead_code)]
-fn parse_width(s: &str) -> Result<u32, &'static str> {
-    s.parse().map_err(|_| "not a number")
-}
-
-#[allow(dead_code)]
-fn parse_path(s: &std::ffi::OsStr) -> Result<std::path::PathBuf, &'static str> {
-    Ok(s.into())
-}
+*/

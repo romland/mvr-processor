@@ -112,6 +112,13 @@ pub fn handle_raw_mvr_connection(stream: &mut BufStream<TcpStream>, chan: Sender
 	let mut frame_start;
 	let mut last_history_id = 0;
 
+	// Do some prep-work.
+	for mv in (0..BUFSIZE).step_by(4) {
+		let index = mv / 4;
+		vectors[index].x = (index % VECTORS_WIDTH) as i16;
+		vectors[index].y = (index / VECTORS_WIDTH) as i16;
+	}
+
 	loop {
         stream.read_exact(&mut buffer).unwrap(); //TODO: non-blocking read
 		
@@ -130,8 +137,6 @@ pub fn handle_raw_mvr_connection(stream: &mut BufStream<TcpStream>, chan: Sender
 
 		candidates.clear();
 
-		// let mut debug_ascii: Vec<u8> = vec![b' '; VECTOR_COUNT];
-
 		for mv in (0..BUFSIZE).step_by(4) {
 			let index = mv / 4;
 
@@ -139,13 +144,10 @@ pub fn handle_raw_mvr_connection(stream: &mut BufStream<TcpStream>, chan: Sender
 			vectors[index].dy = buffer[mv + 1] as i8;
 
 			// TODO: what is it, actually: 1) signed/unsigned? 2) little/big endian?
+			// Note: Later I concluded that it is little endian and unsigned. 
+			// Why I did not delete this TODO, I do not know.
 			vectors[index].sad = LittleEndian::read_u16(&buffer[mv + 2..mv + 4]);
 
-			if vectors[index].x == -1 {
-				vectors[index].x = (index % VECTORS_WIDTH) as i16;
-				vectors[index].y = (index / VECTORS_WIDTH) as i16;
-			}
-			
 			vectors[index].dir = (vectors[index].dy as f32).atan2(-(vectors[index].dx) as f32) * 180.0 / PI + 180.0;
 			vectors[index].mag = (
 				(
@@ -153,31 +155,15 @@ pub fn handle_raw_mvr_connection(stream: &mut BufStream<TcpStream>, chan: Sender
 					(vectors[index].dy as i32) * (vectors[index].dy as i32)
 				) as f32).sqrt();
 
-			// TODO: This 'sad' check is just a test to get rid of noise in low-light conditions...
+			// This SAD check is good for low-light conditions.
 			if vectors[index].mag >= 2.0 && vectors[index].sad > 250 {
-				total_mag += vectors[index].mag;		// TODO: to include mag of all or just ones that are deemed active?
+				// XXX: to include mag of all or just ones that are deemed active?
+				total_mag += vectors[index].mag;
 				candidates.push(vectors[index].clone());
-				// debug_ascii[index] = b'*';
-				// println!("YES {}", vectors[index].sad);
-			} else {
-				// debug_ascii[index] = b'.';
-				// println!("NO  {}", vectors[index].sad);
 			}
 		}
-		
-		// This output looks good too and it's not reduce (reproduced without that code),
-		// ...which means it's dbscan!
-		/*
-		for i in (0..debug_ascii.len()).step_by(VECTORS_WIDTH) {
-			let line = match std::str::from_utf8(&debug_ascii[i..i+VECTORS_WIDTH]) {
-				Ok(v) => v,
-				Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-			};
-			println!("{}", line);
-		}
-		*/
 
-		// reduce!
+		// Reduce!
 		let (reduced, factor) = match reduce_candidates(&mut candidates) {
 			None => (false, 1),
 			Some((new_candidates, factor)) => {
@@ -203,7 +189,6 @@ pub fn handle_raw_mvr_connection(stream: &mut BufStream<TcpStream>, chan: Sender
 			temporal_expiration(&mut history, &frame_start, DISCARD_CLUSTERS_AFTER);
 		}
 
-		// let ser_cost = Instant::now();
 		// TODO: Can I get rid of this .clone() somehow?
 		let msg = ClusterMessage {
 			clusters: clusters,
@@ -217,9 +202,7 @@ pub fn handle_raw_mvr_connection(stream: &mut BufStream<TcpStream>, chan: Sender
 		};
 
 		let json = serde_json::to_string(&msg).unwrap();
-		// println!("JSON+write {}ms", ser_cost.elapsed().as_millis());
 
-		// This is crucial if deploying to Raspi
 		println!("{}", json);
     }
 }
@@ -497,80 +480,3 @@ fn overlaps(c1: &Cluster, c2: &Cluster) -> bool
 
 	true
 }
-
-
-/*
-// overlapping is the cluster in history
-trackTemporal(cluster, now)
-{
-	let overlapping = this.overlapsAny(cluster, this.history);
-	if(overlapping !== false) {
-		// update cluster in history
-		cluster.age = now - overlapping.birth;
-		overlapping.active = now;
-		overlapping.age = cluster.age;
-
-		// Do I want to update the history box? Let's see...
-		// Do it only if we are more dense (and often bigger) than the one stored...
-//			if(cluster.points.length > overlapping.size) {
-			overlapping.bbox = [...cluster.bbox];
-			overlapping.size = cluster.points.length;
-
-			overlapping.points = [...cluster.points];
-			overlapping.mag = cluster.mag;
-			overlapping.dir = cluster.dir;
-//			}
-	} else {
-		// add new cluster to history
-		this.history.push({
-			id : this.historyClusterId++,
-			age : 0,
-			active : now,
-			birth : now,
-			bbox : [...cluster.bbox],
-			size : cluster.points.length,
-
-			points : [...cluster.points],
-			mag : cluster.mag,
-			dir : cluster.dir
-		});
-	}
-}
-
-
-// discardInactiveAfter
-// Expire ones that have had no activity for expireAfter ms
-temporalExpiration(now)
-{
-	// TODO: Move out of this scope
-	const expireAfter = this.conf.get("discardInactiveAfter");
-
-	for(let i = this.history.length - 1; i >= 0; i--) {
-		if((now - this.history[i].active) > expireAfter) {
-			this.history.splice(i, 1);
-		}
-	}
-}
-
-overlapsAny(c, cAll)
-{
-	for(let i = 0; i < cAll.length; i++) {
-		if(this.overlaps(c, cAll[i])) {
-			return cAll[i];
-		}
-	}
-
-	return false;
-}
-
-overlaps(c1, c2)
-{
-	if (c1.bbox[1] < c2.bbox[3]) return false;
-	if (c2.bbox[1] < c1.bbox[3]) return false;
-
-	if (c1.bbox[2] < c2.bbox[0]) return false;
-	if (c2.bbox[2] < c1.bbox[0]) return false;
-
-	return true;
-}
-*/

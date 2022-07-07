@@ -58,38 +58,6 @@ impl<'a> DbScan<'_> {
 
 		neighbours.to_vec()
 	}
-/*
-This does not work for ... some still unknown reason!
-
-	fn get_neighbours(&mut self, point_ix: usize) -> Vec<usize>
-	{
-		let neighbours: &mut Vec<usize> = &mut vec![0_usize; 0];
-
-		let point: &MotionVector = &self.data[point_ix];
-		let mut i = 0;
-
-		for v in self.data {
-			if std::ptr::eq(v, point) {
-				continue;
-			}
-			
-			// The pre-check before calling distance() will actually cut
-			// execution time down to 50% (and more in quiet scenarios). It
-			// also seems to make execution time a little more predictable.
-			// The downside is that it makes epsilon mean something else.
-			// if self.euclidean_distance(v, point) <= self.eps {
-			if (v.x - point.x).abs() < self.epsilon as i16 && // Math.abs(this.data[i].y - d.y) < this.eps &&
-				self.manhattan_distance(v, point) <= self.epsilon
-			{
-				neighbours.push(i);
-			}
-
-			i += 1;
-		}
-
-		neighbours.to_vec()
-	}
-*/
 
 	fn expand(&mut self, point_ix: usize, neighbours: &mut Vec<usize>, cluster_ix: usize) {
 
@@ -119,7 +87,9 @@ This does not work for ... some still unknown reason!
 		}
 	}
 
-	// TODO: Consider using a SIMD version?
+	// TODO: Consider using some kind of a SIMD version? How to do it in Rust?
+	// Note: As it is right now, I am actually quite fine with using manhattan distance, 
+	//       which would not benefit awesomely from SIMD.
 	#[allow(dead_code)]
 	fn euclidean_distance(&self, point1: &MotionVector, point2: &MotionVector) -> f32 {
 		(((point2.x - point1.x).pow(2) + (point2.y - point1.y).pow(2)) as f32).sqrt()
