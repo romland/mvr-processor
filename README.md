@@ -16,7 +16,7 @@ It operates in the following ways on these motion vectors:
 
 I think the density based scan is quite fast. That said, the way things
 are implemented, `epsilon` might not mean _exactly_ what you would expect.
-But as long as I am not using euclidean distance, I matters little.
+But as long as I am not using euclidean distance, it matters little.
 
 Stand-alone, without Xorzee, this is probably of little use to you. :-)
 
