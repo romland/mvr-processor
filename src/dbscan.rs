@@ -12,7 +12,7 @@ impl<'a> DbScan<'_> {
 	{
 		let mut next_ix: usize = 0;
 
-		let mut neighbours: Vec<usize>;// = Vec::with_capacity(100); //vec![0_usize; 0];
+		let mut neighbours: Vec<usize>;
 
 		for i in 0..self.data.len() {
 			if self.results[i] != 0xffff {
@@ -44,14 +44,12 @@ impl<'a> DbScan<'_> {
 
 			v = &self.data[i];
 			
-			// The pre-check before calling distance() will actually cut
+			// The pre-check before calling x_distance() will actually cut
 			// execution time down to 50% (and more in quiet scenarios). It
-			// also seems to make execution time a little more predictable.
-			// The downside is that it makes epsilon mean something else.
-			// if self.euclidean_distance(v, point) <= self.eps {
-			if (v.x - point.x).abs() < self.epsilon as i16 && // Math.abs(this.data[i].y - d.y) < this.eps &&
-				self.manhattan_distance(v, point) <= self.epsilon
-			{
+			// also makes execution time a little more predictable. The (big)
+			// downside is that it makes epsilon mean something else.
+			if (v.x - point.x).abs() < self.epsilon as i16 && 
+			   self.manhattan_distance(v, point) <= self.epsilon {
 				neighbours.push(i);
 			}
 		}
@@ -61,10 +59,10 @@ impl<'a> DbScan<'_> {
 
 	fn expand(&mut self, point_ix: usize, neighbours: &mut Vec<usize>, cluster_ix: usize) {
 
-		self.results[point_ix] = cluster_ix;				// Assign cluster id
+		// Assign cluster id (which is just an index)
+		self.results[point_ix] = cluster_ix;
 
-		// let mut curr_neighbours: Vec<usize> = Vec::with_capacity(100); //vec![0_usize; 0];
-		let mut curr_neighbours: Vec<usize>;// = vec![0_usize; 0];
+		let mut curr_neighbours: Vec<usize>;
 
 		let mut curr_point_ix;
 
@@ -72,7 +70,8 @@ impl<'a> DbScan<'_> {
 			curr_point_ix = neighbours[i];
 
 			if self.results[curr_point_ix] == 0xffff {
-				self.results[curr_point_ix] = 0;			// Visited and marked as noise by default
+				// Default: Point visited and marked as noise
+				self.results[curr_point_ix] = 0;
 				curr_neighbours = self.get_neighbours(curr_point_ix);
 
 				if curr_neighbours.len() >= self.min_points {
@@ -81,7 +80,7 @@ impl<'a> DbScan<'_> {
 			}
 
 			if self.results[curr_point_ix] < 1 {
-				// Not assigned to a cluster but visited (= 0)
+				// Point not assigned to a cluster but visited (= 0)
 				self.results[curr_point_ix] = cluster_ix;
 			}
 		}
