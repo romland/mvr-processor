@@ -2,7 +2,7 @@
 This is a helper program written for the server-side of [Xorzee](https://github.com/romland/xorzee), which is largely
 written under node-js. Due to performance needs, this is written in [Rust](https://www.rust-lang.org/).
 
-The pgoram expects a stream of 32-bit coarse motion vectors and will output a stream of JSON
+The program expects a stream of 32-bit coarse motion vectors and will output a stream of JSON
 messages that will then be passed on by the node-server over websockets to clients.
 
 It operates in the following ways on coarse motion vectors:
