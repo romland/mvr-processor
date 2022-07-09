@@ -12,7 +12,7 @@ It operates in the following ways on these motion vectors:
 - Filter
 - Categorize
 - Density based cluster
-- Temporally track clusters
+- Temporal tracking
 
 I think the density based scan is quite fast. That said, the way things
 are implemented, `epsilon` might not mean _exactly_ what you would expect.
